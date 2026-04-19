@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # civicdao_new
 
 A new Flutter project.
@@ -14,3 +15,6 @@ A few resources to get you started if this is your first Flutter project:
 For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev/), which offers tutorials,
 samples, guidance on mobile development, and a full API reference.
+=======
+# civicdao
+>>>>>>> 2e2112114fe0a7d0cdf1eebf823a5f108b58c5aa
