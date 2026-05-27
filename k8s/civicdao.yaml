@@ -1,0 +1,185 @@
+## CivicDAO — Kubernetes Manifests
+## Apply with: kubectl apply -f k8s/civicdao.yaml
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: civicdao
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: civicdao-config
+  namespace: civicdao
+data:
+  NODE_ENV: "production"
+  PORT: "3000"
+  JWT_EXPIRY: "1h"
+  REFRESH_TOKEN_EXPIRY: "7d"
+  BCRYPT_SALT_ROUNDS: "12"
+  CORS_ORIGIN: "*"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: civicdao-secrets
+  namespace: civicdao
+type: Opaque
+data:
+  JWT_SECRET: REPLACE_WITH_BASE64_SECRET
+  JWT_REFRESH_SECRET: REPLACE_WITH_BASE64_REFRESH
+  MONGO_PASSWORD: REPLACE_WITH_BASE64_MONGO_PASS
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongodb
+  namespace: civicdao
+spec:
+  serviceName: mongodb
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongodb
+  template:
+    metadata:
+      labels:
+        app: mongodb
+    spec:
+      containers:
+        - name: mongodb
+          image: mongo:7.0
+          ports:
+            - containerPort: 27017
+          env:
+            - name: MONGO_INITDB_ROOT_USERNAME
+              value: admin
+            - name: MONGO_INITDB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: civicdao-secrets
+                  key: MONGO_PASSWORD
+          volumeMounts:
+            - name: mongo-storage
+              mountPath: /data/db
+          resources:
+            requests: { memory: "256Mi", cpu: "250m" }
+            limits: { memory: "512Mi", cpu: "500m" }
+  volumeClaimTemplates:
+    - metadata:
+        name: mongo-storage
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 5Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb
+  namespace: civicdao
+spec:
+  clusterIP: None
+  selector:
+    app: mongodb
+  ports:
+    - port: 27017
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: civicdao-backend
+  namespace: civicdao
+  labels:
+    app: civicdao-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: civicdao-backend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: civicdao-backend
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3000"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+        - name: civicdao-backend
+          image: registry.civicdao.org/civicdao/backend:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: civicdao-config
+          env:
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: civicdao-secrets
+                  key: JWT_SECRET
+            - name: JWT_REFRESH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: civicdao-secrets
+                  key: JWT_REFRESH_SECRET
+          livenessProbe:
+            httpGet: { path: /health, port: 3000 }
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          readinessProbe:
+            httpGet: { path: /health, port: 3000 }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests: { memory: "128Mi", cpu: "100m" }
+            limits: { memory: "256Mi", cpu: "500m" }
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: civicdao-backend
+  namespace: civicdao
+spec:
+  selector:
+    app: civicdao-backend
+  ports:
+    - port: 80
+      targetPort: 3000
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: civicdao-hpa
+  namespace: civicdao
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: civicdao-backend
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
