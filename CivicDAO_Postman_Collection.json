@@ -1,0 +1,321 @@
+{
+  "info": {
+    "name": "CivicDAO API",
+    "_postman_id": "civicdao-api-collection",
+    "description": "Complete API documentation for CivicDAO Community Governance Platform.\n\nBase URL: http://YOUR_VPS_IP:3000/api\n\nAuthentication: All protected routes require a Bearer token in the Authorization header.\nGet the token from POST /api/login or POST /api/register.\n\nCourse: SEN3244 Software Architecture — Spring 2026",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:3000/api", "type": "string" },
+    { "key": "token",    "value": "",                           "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "1. Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "url":    "{{base_url}}/register",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"alice@civicdao.org\",\n  \"password\": \"Secure123\",\n  \"name\": \"Alice Martin\"\n}"
+            }
+          },
+          "response": [],
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                "const data = pm.response.json();",
+                "pm.environment.set('token', data.token);",
+                "pm.test('Has token', () => pm.expect(data.token).to.be.a('string'));",
+                "pm.test('Role is member', () => pm.expect(data.user.role).to.eql('member'));"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "url":    "{{base_url}}/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"alice@civicdao.org\",\n  \"password\": \"Secure123\"\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "const data = pm.response.json();",
+                "pm.environment.set('token', data.token);",
+                "pm.test('Token present', () => pm.expect(data.token).to.be.a('string'));"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "url":    "{{base_url}}/refresh",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refresh_token}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "url":    "{{base_url}}/logout",
+            "header": [
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refresh_token}}\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Proposals",
+      "item": [
+        {
+          "name": "Get All Proposals",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw":   "{{base_url}}/proposals",
+              "query": [
+                { "key": "status", "value": "voting",  "disabled": true },
+                { "key": "page",   "value": "1",       "disabled": false },
+                { "key": "limit",  "value": "20",      "disabled": false }
+              ]
+            },
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "pm.test('Has proposals array', () => pm.expect(pm.response.json().proposals).to.be.an('array'));"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Get Proposals by Status (voting)",
+          "request": {
+            "method": "GET",
+            "url":    "{{base_url}}/proposals?status=voting",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Get Single Proposal",
+          "request": {
+            "method": "GET",
+            "url":    "{{base_url}}/proposals/{{proposal_id}}",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Create Proposal",
+          "request": {
+            "method": "POST",
+            "url":    "{{base_url}}/proposals",
+            "header": [
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Build a community park\",\n  \"description\": \"We need a green space in the neighbourhood for children and families.\",\n  \"requestedBudget\": 8500,\n  \"category\": \"Environment\",\n  \"voteEndDate\": \"2026-07-01T00:00:00.000Z\"\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                "const p = pm.response.json();",
+                "pm.environment.set('proposal_id', p._id);",
+                "pm.test('Status is pending', () => pm.expect(p.status).to.eql('pending'));"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Update Proposal Status (Admin)",
+          "request": {
+            "method": "PUT",
+            "url":    "{{base_url}}/proposals/{{proposal_id}}/status",
+            "header": [
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"voting\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Voting",
+      "item": [
+        {
+          "name": "Submit Vote",
+          "request": {
+            "method": "POST",
+            "url":    "{{base_url}}/vote",
+            "header": [
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"proposalId\": \"{{proposal_id}}\",\n  \"vote\": true\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "pm.test('Success true', () => pm.expect(pm.response.json().success).to.be.true);"
+              ]
+            }
+          }]
+        }
+      ]
+    },
+    {
+      "name": "4. Treasury",
+      "item": [
+        {
+          "name": "Get Treasury",
+          "request": {
+            "method": "GET",
+            "url":    "{{base_url}}/treasury",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "const d = pm.response.json();",
+                "pm.test('Has balance', () => pm.expect(d.balance).to.be.a('number'));",
+                "pm.test('Has transactions', () => pm.expect(d.transactions).to.be.an('array'));"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Add Transaction (Admin)",
+          "request": {
+            "method": "POST",
+            "url":    "{{base_url}}/treasury",
+            "header": [
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"deposit\",\n  \"amount\": 5000,\n  \"description\": \"Annual community funding\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Users",
+      "item": [
+        {
+          "name": "Get All Users (Admin)",
+          "request": {
+            "method": "GET",
+            "url":    "{{base_url}}/users",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Get My Profile",
+          "request": {
+            "method": "GET",
+            "url":    "{{base_url}}/users/me",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Suspend User (Admin)",
+          "request": {
+            "method": "PUT",
+            "url":    "{{base_url}}/users/{{user_id}}/suspend",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Reactivate User (Admin)",
+          "request": {
+            "method": "PUT",
+            "url":    "{{base_url}}/users/{{user_id}}/reactivate",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Promote to Admin",
+          "request": {
+            "method": "PUT",
+            "url":    "{{base_url}}/users/{{user_id}}/promote",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. System",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url":    "http://localhost:3000/health"
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "pm.test('DB connected', () => pm.expect(pm.response.json().db).to.eql('connected'));"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Prometheus Metrics",
+          "request": {
+            "method": "GET",
+            "url":    "http://localhost:3000/metrics"
+          }
+        }
+      ]
+    }
+  ]
+}

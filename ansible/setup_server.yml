@@ -1,0 +1,109 @@
+---
+# CivicDAO Ansible Playbook 1 — Provision VPS
+# Usage: ansible-playbook -i inventory.yml ansible/setup_server.yml
+
+- name: Provision CivicDAO VPS
+  hosts: civicdao_servers
+  become: yes
+
+  vars:
+    app_user: civicdao
+    app_dir: /opt/civicdao
+
+  tasks:
+
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install base packages
+      apt:
+        name:
+          - curl
+          - wget
+          - git
+          - unzip
+          - htop
+          - ufw
+          - fail2ban
+          - nginx
+        state: present
+
+    - name: Create civicdao user
+      user:
+        name: "{{ app_user }}"
+        shell: /bin/bash
+        home: "{{ app_dir }}"
+        create_home: yes
+
+    - name: Add Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable"
+        state: present
+
+    - name: Install Docker CE
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-compose-plugin
+        state: latest
+
+    - name: Add user to docker group
+      user:
+        name: "{{ app_user }}"
+        groups: docker
+        append: yes
+
+    - name: Start and enable Docker
+      systemd:
+        name: docker
+        enabled: yes
+        state: started
+
+    - name: Allow SSH through firewall
+      ufw:
+        rule: allow
+        port: '22'
+        proto: tcp
+
+    - name: Allow HTTP through firewall
+      ufw:
+        rule: allow
+        port: '80'
+        proto: tcp
+
+    - name: Allow HTTPS through firewall
+      ufw:
+        rule: allow
+        port: '443'
+        proto: tcp
+
+    - name: Enable UFW
+      ufw:
+        state: enabled
+        policy: deny
+
+    - name: Start Fail2Ban
+      systemd:
+        name: fail2ban
+        enabled: yes
+        state: started
+
+    - name: Create app directory
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        owner: "{{ app_user }}"
+        mode: '0755'
+
+    - name: Done
+      debug:
+        msg: "Server provisioned. Docker, Nginx, UFW and Fail2Ban are ready."

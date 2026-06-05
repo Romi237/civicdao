@@ -1,0 +1,74 @@
+# CivicDAO — GitHub Actions CI
+# Runs on every push and pull request to main or develop
+
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+
+  flutter-tests:
+    name: Flutter Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.0'
+          channel: stable
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyse code
+        run: flutter analyze --no-fatal-infos
+
+      - name: Run tests with coverage
+        run: flutter test --coverage
+
+  backend-tests:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+
+    services:
+      mongodb:
+        image: mongo:7.0
+        ports: ["27017:27017"]
+        options: >-
+          --health-cmd "mongosh --eval \"db.adminCommand('ping')\""
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Run backend tests
+        working-directory: backend
+        env:
+          NODE_ENV: test
+          JWT_SECRET: github-ci-test-secret-long-enough-123
+          JWT_REFRESH_SECRET: github-ci-refresh-secret-long-enough-456
+          MONGODB_URI: mongodb://localhost:27017/civicdao_test
+          BCRYPT_SALT_ROUNDS: "4"
+        run: npm test
