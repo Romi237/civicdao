@@ -29,13 +29,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     if (!mounted) return;
     if (result['success'] == true) {
       setState(() {
-        _notifs = (result['notifications'] as List)
-            .map((e) {
-              final item = Map<String, dynamic>.from(e as Map);
-              item['id'] = (item['id'] ?? item['_id'] ?? '').toString();
-              return item;
-            })
-            .toList();
+        _notifs = (result['notifications'] as List).map((e) {
+          final item = Map<String, dynamic>.from(e as Map);
+          item['id'] = (item['id'] ?? item['_id'] ?? '').toString();
+          return item;
+        }).toList();
         _loading = false;
       });
     } else {
