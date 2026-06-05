@@ -1,0 +1,394 @@
+openapi: 3.0.3
+
+info:
+  title: CivicDAO API
+  version: 1.0.0
+  description: |
+    CivicDAO Governance Platform API
+
+    Features:
+      - Authentication
+      - Proposal Management
+      - Voting
+      - Treasury Management
+      - Delegation
+      - Notifications
+      - User Administration
+      - Onboarding
+
+servers:
+  - url: http://localhost:3000
+    description: Local Development
+
+tags:
+  - name: Authentication
+  - name: System
+  - name: Proposals
+  - name: Voting
+  - name: Treasury
+  - name: Users
+  - name: Delegates
+  - name: Notifications
+  - name: Onboarding
+
+components:
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+
+    RegisterRequest:
+      type: object
+      required:
+        - email
+        - password
+        - name
+      properties:
+        email:
+          type: string
+          example: user@example.com
+        password:
+          type: string
+          example: password123
+        name:
+          type: string
+          example: John Doe
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          example: admin@example.com
+        password:
+          type: string
+          example: password123
+
+    RefreshRequest:
+      type: object
+      required:
+        - refreshToken
+      properties:
+        refreshToken:
+          type: string
+
+    Proposal:
+      type: object
+      properties:
+        _id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        requestedBudget:
+          type: number
+        authorName:
+          type: string
+        status:
+          type: string
+          enum:
+            - pending
+            - voting
+            - accepted
+            - rejected
+        yesVotes:
+          type: integer
+        noVotes:
+          type: integer
+        totalVotes:
+          type: integer
+
+    ProposalCreate:
+      type: object
+      required:
+        - title
+        - description
+        - requestedBudget
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        requestedBudget:
+          type: number
+        voteEndDate:
+          type: string
+          format: date-time
+        category:
+          type: string
+
+    VoteRequest:
+      type: object
+      required:
+        - proposalId
+        - vote
+      properties:
+        proposalId:
+          type: string
+        vote:
+          type: boolean
+
+paths:
+
+  /health:
+    get:
+      tags:
+        - System
+      summary: Health Check
+      responses:
+        '200':
+          description: Service healthy
+
+  /metrics:
+    get:
+      tags:
+        - System
+      summary: Prometheus Metrics
+      responses:
+        '200':
+          description: Metrics output
+
+  /api/register:
+    post:
+      tags:
+        - Authentication
+      summary: Register New User
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+
+      responses:
+        '201':
+          description: User created
+
+        '400':
+          description: Validation error
+
+        '500':
+          description: Server error
+
+  /api/login:
+    post:
+      tags:
+        - Authentication
+      summary: Login
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+
+      responses:
+        '200':
+          description: Login successful
+
+        '400':
+          description: Invalid credentials
+
+  /api/refresh:
+    post:
+      tags:
+        - Authentication
+      summary: Refresh JWT Token
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+
+      responses:
+        '200':
+          description: Token refreshed
+
+        '401':
+          description: Invalid refresh token
+
+  /api/logout:
+    post:
+      tags:
+        - Authentication
+      summary: Logout User
+
+      security:
+        - BearerAuth: []
+
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken:
+                  type: string
+
+      responses:
+        '200':
+          description: Logged out
+
+  /api/proposals:
+    get:
+      tags:
+        - Proposals
+      summary: Get Proposals
+
+      security:
+        - BearerAuth: []
+
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+
+        - name: page
+          in: query
+          schema:
+            type: integer
+
+        - name: limit
+          in: query
+          schema:
+            type: integer
+
+      responses:
+        '200':
+          description: Proposal list
+
+    post:
+      tags:
+        - Proposals
+      summary: Create Proposal
+
+      security:
+        - BearerAuth: []
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProposalCreate'
+
+      responses:
+        '201':
+          description: Proposal created
+
+  /api/proposals/{id}:
+    get:
+      tags:
+        - Proposals
+      summary: Get Proposal By ID
+
+      security:
+        - BearerAuth: []
+
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+
+      responses:
+        '200':
+          description: Proposal found
+
+        '404':
+          description: Proposal not found
+
+  /api/proposals/{id}/status:
+  put:
+    tags:
+      - Proposals
+
+    security:
+      - BearerAuth: []
+
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - status
+            properties:
+              status:
+                type: string
+                enum:
+                  - pending
+                  - voting
+                  - accepted
+                  - rejected
+
+    responses:
+      '200':
+        description: Status updated
+
+      '400':
+        description: Invalid status
+
+      '403':
+        description: Admin only
+
+      '404':
+        description: Proposal not found
+
+  /api/proposals/categories:
+    get:
+      tags:
+        - Proposals
+      summary: Get Categories
+
+      responses:
+        '200':
+          description: Categories returned
+
+  /api/vote:
+    post:
+      tags:
+        - Voting
+      summary: Cast Vote
+
+      security:
+        - BearerAuth: []
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VoteRequest'
+
+      responses:
+        '200':
+          description: Vote recorded
+
+        '400':
+          description: Already voted or invalid request
+
+        '404':
+          description: Proposal not found

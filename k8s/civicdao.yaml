@@ -120,7 +120,7 @@ spec:
     spec:
       containers:
         - name: civicdao-backend
-          image: registry.civicdao.org/civicdao/backend:latest
+          image: nanshie/civicdao-backend:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 3000

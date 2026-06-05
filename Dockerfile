@@ -17,8 +17,8 @@ WORKDIR /app
 
 # Copy only what we need
 COPY --from=deps /app/node_modules ./node_modules
-COPY backend/server.js ./
-COPY backend/dds.js ./
+COPY backend/ .
+
 
 RUN chown -R civicdao:civicdao /app
 USER civicdao
