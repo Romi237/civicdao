@@ -2,8 +2,12 @@ const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose'); 
 const bcrypt = require('bcryptjs'); 
-const jwt = require('jsonwebtoken'); 
+const jwt = require('jsonwebtoken');
+const swaggerUi = require("swagger-ui-express");
+const YAML = require("yamljs"); 
 const rateLimit = require('express-rate-limit'); require('dotenv').config(); 
+const client = require('prom-client');
+
 
 const app = express(); 
 const PORT = process.env.PORT || 3000; 
@@ -12,7 +16,26 @@ const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET; 
 const BCRYPT_ROUNDS = parseInt(process.env.BCRYPT_SALT_ROUNDS || '12'); 
 const JWT_EXPIRY = process.env.JWT_EXPIRY || '1h'; 
-const REFRESH_EXPIRY = process.env.REFRESH_TOKEN_EXPIRY || '7d'; 
+const REFRESH_EXPIRY = process.env.REFRESH_TOKEN_EXPIRY || '7d';
+const swaggerDocument = YAML.load("./swagger.yaml");
+
+client.collectDefaultMetrics();
+
+const totalUsers = new client.Gauge({
+  name: 'civicdao_users_total',
+  help: 'Total registered users'
+});
+
+const totalProposals = new client.Gauge({
+  name: 'civicdao_proposals_total',
+  help: 'Total proposals'
+});
+
+const totalVotes = new client.Gauge({
+  name: 'civicdao_votes_total',
+  help: 'Total votes'
+});
+
 
 if (!JWT_SECRET) { 
   console.error('ERROR: JWT_SECRET not set. Run: node dds.js'); 
@@ -31,7 +54,33 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use((req, _res, next) => { 
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`); 
   next(); 
-}); 
+});
+
+const helmet = require("helmet");
+
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+  })
+);
+
+
+
+app.get('/swagger-json', (req, res) => {
+  res.json(swaggerDocument);
+});
+
+app.get('/swagger-test', (req, res) => {
+  res.send('swagger route works');
+});
+
+console.log("Loading Swagger...");
+
+app.use(
+  "/api-docs",
+  swaggerUi.serve,
+  swaggerUi.setup(swaggerDocument)
+);
 
 const authLimit = rateLimit({ 
   windowMs: 15 * 60 * 1000, 
@@ -201,26 +250,18 @@ app.get('/health', (_req, res) =>
   res.json({ status: 'ok', db: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected', uptime: Math.round(process.uptime()) }) 
 ); 
 
-app.get('/metrics', async (_req, res) => { 
-  try { 
-    const [users, proposals, votes, active] = await Promise.all([ 
-      User.countDocuments(), 
-      Proposal.countDocuments(), 
-      Vote.countDocuments(), 
-      Proposal.countDocuments({ status: 'voting' }), 
-    ]); 
-    res.set('Content-Type', 'text/plain'); 
-    res.send([ 
-      `civicdao_users_total ${users}`, 
-      `civicdao_proposals_total ${proposals}`, 
-      `civicdao_active_proposals ${active}`, 
-      `civicdao_votes_total ${votes}`, 
-      `civicdao_uptime_seconds ${Math.round(process.uptime())}`, 
-    ].join('\n')); 
-  } catch { 
-    res.status(500).send('# metrics error'); 
-  } 
-}); 
+app.get('/metrics', async (_req, res) => {
+  try {
+    totalUsers.set(await User.countDocuments());
+    totalProposals.set(await Proposal.countDocuments());
+    totalVotes.set(await Vote.countDocuments());
+
+    res.set('Content-Type', client.register.contentType);
+    res.end(await client.register.metrics());
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
 
 app.post('/api/register', async (req, res) => { 
   try { 
