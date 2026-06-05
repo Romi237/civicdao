@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../navigation/app_routes.dart';
+import '../services/auth_service.dart';
 import 'app_theme.dart';
 import 'shared_widgets.dart';
 
@@ -15,49 +16,54 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passCtrl = TextEditingController();
   bool _obscure = true;
   bool _loading = false;
+  String _error = '';
 
   @override
   void initState() {
     super.initState();
-    _emailCtrl.addListener(_updateFormState);
-    _passCtrl.addListener(_updateFormState);
+    // Restore session — if already logged in, go straight to home
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final auth = AuthService();
+      await auth.init();
+      if (auth.isLoggedIn && mounted) {
+        Navigator.pushReplacementNamed(context, AppRoutes.mainShell);
+      }
+    });
+    _emailCtrl.addListener(() => setState(() {}));
+    _passCtrl.addListener(() => setState(() {}));
   }
 
   @override
   void dispose() {
-    _emailCtrl.removeListener(_updateFormState);
-    _passCtrl.removeListener(_updateFormState);
     _emailCtrl.dispose();
     _passCtrl.dispose();
     super.dispose();
   }
 
-  bool get _canSubmit {
-    return _emailCtrl.text.trim().isNotEmpty &&
-        _passCtrl.text.trim().isNotEmpty;
-  }
+  bool get _canSubmit =>
+      _emailCtrl.text.trim().isNotEmpty && _passCtrl.text.trim().isNotEmpty;
 
-  void _updateFormState() {
-    if (mounted) setState(() {});
-  }
-
-  void _login() async {
+  Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
     FocusScope.of(context).unfocus();
-    setState(() => _loading = true);
-    await Future.delayed(const Duration(milliseconds: 800));
+    setState(() {
+      _loading = true;
+      _error = '';
+    });
+
+    final result = await AuthService().login(
+      _emailCtrl.text.trim(),
+      _passCtrl.text,
+    );
+
     if (!mounted) return;
     setState(() => _loading = false);
-    Navigator.pushReplacementNamed(context, AppRoutes.mainShell);
-  }
 
-  void _connectWallet() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Wallet connection is coming soon.'),
-        duration: Duration(seconds: 2),
-      ),
-    );
+    if (result['success'] == true) {
+      Navigator.pushReplacementNamed(context, AppRoutes.mainShell);
+    } else {
+      setState(() => _error = result['error'] ?? 'Login failed.');
+    }
   }
 
   @override
@@ -115,6 +121,43 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
               const SizedBox(height: 20),
+
+              // Error banner
+              if (_error.isNotEmpty) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: AppColors.red.withValues(alpha: 31),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.red.withValues(alpha: 76)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.error_outline,
+                        color: AppColors.red,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _error,
+                          style: const TextStyle(
+                            color: AppColors.red,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
               Form(
                 key: _formKey,
                 child: Column(
@@ -124,13 +167,13 @@ class _LoginScreenState extends State<LoginScreen> {
                       style: const TextStyle(color: Colors.white),
                       keyboardType: TextInputType.emailAddress,
                       autovalidateMode: AutovalidateMode.onUserInteraction,
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) {
                           return 'Email is required';
                         }
                         if (!RegExp(
                           r'^[^@]+@[^@]+\.[^@]+',
-                        ).hasMatch(value.trim())) {
+                        ).hasMatch(v.trim())) {
                           return 'Enter a valid email';
                         }
                         return null;
@@ -150,12 +193,13 @@ class _LoginScreenState extends State<LoginScreen> {
                       obscureText: _obscure,
                       style: const TextStyle(color: Colors.white),
                       autovalidateMode: AutovalidateMode.onUserInteraction,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
+                      onFieldSubmitted: (_) => _login(),
+                      validator: (v) {
+                        if (v == null || v.isEmpty) {
                           return 'Password is required';
                         }
-                        if (value.length < 8) {
-                          return 'Password must be at least 8 characters';
+                        if (v.length < 6) {
+                          return 'Password must be at least 6 characters';
                         }
                         return null;
                       },
@@ -201,17 +245,12 @@ class _LoginScreenState extends State<LoginScreen> {
                       onTap: _login,
                       enabled: _canSubmit,
                     ),
-              const SizedBox(height: 12),
-              OutlineButton2(
-                label: 'Connect wallet instead',
-                onTap: _connectWallet,
-              ),
               const SizedBox(height: 24),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Text(
-                    "No account? ",
+                    'No account? ',
                     style: TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 13,

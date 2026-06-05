@@ -52,7 +52,10 @@ app.use('/api/register', authLimit);
 app.use('/api/', apiLimit); 
 
 mongoose.connect(MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true }) 
-  .then(() => console.log('Connected to MongoDB')) 
+  .then(async () => { 
+    console.log('Connected to MongoDB'); 
+    await seedDelegateCandidates(); 
+  }) 
   .catch(err => { 
     console.error('MongoDB error:', err.message); 
     process.exit(1); 
@@ -63,6 +66,10 @@ const UserSchema = new mongoose.Schema({
   password: { type: String, required: true }, 
   name: { type: String, required: true }, 
   role: { type: String, enum: ['admin', 'member'], default: 'member' }, 
+  profileRole: { type: String, default: 'Regular member' }, 
+  interests: [String], 
+  delegatedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'Delegate', default: null }, 
+  votingPower: { type: Number, default: 1250 }, 
   joinDate: { type: Date, default: Date.now }, 
   isActive: { type: Boolean, default: true }, 
   votedProposals: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Proposal' }], 
@@ -93,6 +100,24 @@ const VoteSchema = new mongoose.Schema({
 
 VoteSchema.index({ proposalId: 1, userId: 1 }, { unique: true }); 
 
+const DelegateSchema = new mongoose.Schema({ 
+  name: { type: String, required: true }, 
+  initials: { type: String, required: true }, 
+  color: { type: Number, required: true }, 
+  participation: { type: String, default: '0%' }, 
+  delegators: { type: Number, default: 0 }, 
+}); 
+
+const NotificationSchema = new mongoose.Schema({ 
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }, 
+  type: { type: String, default: 'notification' }, 
+  title: { type: String, required: true }, 
+  body: { type: String, required: true }, 
+  color: { type: Number, default: 0xFF8B5CF6 }, 
+  read: { type: Boolean, default: false }, 
+  createdAt: { type: Date, default: Date.now }, 
+}); 
+
 const TreasuryTxSchema = new mongoose.Schema({ 
   type: { type: String, enum: ['deposit','withdrawal','proposal_funded'], required: true }, 
   amount: { type: Number, required: true }, 
@@ -105,7 +130,37 @@ const TreasuryTxSchema = new mongoose.Schema({
 const User = mongoose.model('User', UserSchema); 
 const Proposal = mongoose.model('Proposal', ProposalSchema); 
 const Vote = mongoose.model('Vote', VoteSchema); 
+const Delegate = mongoose.model('Delegate', DelegateSchema); 
+const Notification = mongoose.model('Notification', NotificationSchema); 
 const Treasury = mongoose.model('TreasuryTransaction', TreasuryTxSchema); 
+
+async function seedDelegateCandidates() { 
+  const count = await Delegate.countDocuments(); 
+  if (count > 0) return; 
+  await Delegate.create([ 
+    { 
+      name: 'James Kimani', 
+      initials: 'JK', 
+      color: 0xFF10B981, 
+      participation: '91%', 
+      delegators: 3, 
+    }, 
+    { 
+      name: 'Sofia Ferreira', 
+      initials: 'SF', 
+      color: 0xFFEC4899, 
+      participation: '78%', 
+      delegators: 1, 
+    }, 
+    { 
+      name: 'Nadia Benali', 
+      initials: 'NB', 
+      color: 0xFFF59E0B, 
+      participation: '62%', 
+      delegators: 0, 
+    }, 
+  ]); 
+} 
 
 const validEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e); 
 const validPassword = (p) => typeof p === 'string' && p.length >= 6; 
@@ -357,7 +412,8 @@ app.post('/api/treasury', auth, adminOnly, async (req, res) => {
   } 
 }); 
 
-app.get('/api/users', auth, adminOnly, async (req, res) => { 
+// Allow any authenticated member to view the member directory.
+app.get('/api/users', auth, async (req, res) => { 
   try { 
     const users = await User.find().select('-password -refreshTokens').sort({ joinDate: -1 }); 
     res.json(users); 
@@ -371,6 +427,155 @@ app.get('/api/users/me', auth, async (req, res) => {
     const user = await User.findById(req.user.id).select('-password -refreshTokens'); 
     if (!user) return res.status(404).json({ error: 'User not found.' }); 
     res.json(toSafeUser(user)); 
+  } catch (err) { 
+    res.status(500).json({ error: err.message }); 
+  } 
+}); 
+
+app.get('/api/delegates', auth, async (req, res) => { 
+  try { 
+    const [delegates, user] = await Promise.all([ 
+      Delegate.find().sort({ name: 1 }), 
+      User.findById(req.user.id).populate('delegatedTo'), 
+    ]); 
+    if (!user) return res.status(404).json({ error: 'User not found.' }); 
+    res.json({ 
+      votingPower: user.votingPower ?? 1250, 
+      delegatedTo: user.delegatedTo ? user.delegatedTo._id : null, 
+      delegates, 
+      currentDelegateName: user.delegatedTo ? user.delegatedTo.name : null, 
+    }); 
+  } catch (err) { 
+    res.status(500).json({ error: err.message }); 
+  } 
+}); 
+
+app.post('/api/delegates/:id', auth, async (req, res) => { 
+  try { 
+    const delegate = await Delegate.findById(req.params.id); 
+    if (!delegate) return res.status(404).json({ error: 'Delegate not found.' }); 
+    const user = await User.findById(req.user.id); 
+    if (!user) return res.status(404).json({ error: 'User not found.' }); 
+    const previous = user.delegatedTo ? user.delegatedTo.toString() : null; 
+    if (previous === delegate._id.toString()) { 
+      return res.json({ success: true, delegatedTo: delegate._id }); 
+    } 
+    user.delegatedTo = delegate._id; 
+    await user.save(); 
+    if (previous) { 
+      await Delegate.findByIdAndUpdate(previous, { $inc: { delegators: -1 } }); 
+    } 
+    await Delegate.findByIdAndUpdate(delegate._id, { $inc: { delegators: 1 } }); 
+    res.json({ success: true, delegatedTo: delegate._id }); 
+  } catch (err) { 
+    res.status(500).json({ error: err.message }); 
+  } 
+}); 
+
+app.post('/api/delegates/revoke', auth, async (req, res) => { 
+  try { 
+    const user = await User.findById(req.user.id); 
+    if (!user) return res.status(404).json({ error: 'User not found.' }); 
+    const previous = user.delegatedTo ? user.delegatedTo.toString() : null; 
+    if (!previous) return res.json({ success: true }); 
+    user.delegatedTo = null; 
+    await user.save(); 
+    await Delegate.findByIdAndUpdate(previous, { $inc: { delegators: -1 } }); 
+    res.json({ success: true }); 
+  } catch (err) { 
+    res.status(500).json({ error: err.message }); 
+  } 
+}); 
+
+app.get('/api/notifications', auth, async (req, res) => { 
+  try { 
+    const userId = req.user.id; 
+    const notifications = await Notification.find({ userId }).sort({ createdAt: -1 }); 
+    res.json(notifications); 
+  } catch (err) { 
+    res.status(500).json({ error: err.message }); 
+  } 
+}); 
+
+app.post('/api/notifications/mark-read', auth, async (req, res) => { 
+  try { 
+    const userId = req.user.id; 
+    const ids = Array.isArray(req.body.ids) ? req.body.ids : []; 
+    const filter = { userId }; 
+    if (ids.length) filter._id = { $in: ids }; 
+    await Notification.updateMany(filter, { read: true }); 
+    res.json({ success: true }); 
+  } catch (err) { 
+    res.status(500).json({ error: err.message }); 
+  } 
+}); 
+
+app.get('/api/onboarding/options', auth, async (req, res) => { 
+  try { 
+    res.json({ 
+      roles: [ 
+        { 
+          id: 'regular', 
+          icon: 'person_outline_rounded', 
+          title: 'Regular member', 
+          desc: 'I vote on proposals and participate', 
+          color: 0xFF8B5CF6, 
+        }, 
+        { 
+          id: 'council', 
+          icon: 'star_outline_rounded', 
+          title: 'Council member', 
+          desc: 'I help govern and create proposals', 
+          color: 0xFFF59E0B, 
+        }, 
+        { 
+          id: 'observer', 
+          icon: 'visibility_outlined', 
+          title: 'Observer', 
+          desc: 'I monitor activity without voting', 
+          color: 0xFF22C55E, 
+        }, 
+      ], 
+      interests: [ 
+        'Treasury', 
+        'Governance', 
+        'Events', 
+        'Partnerships', 
+        'Technical', 
+        'Community', 
+      ], 
+    }); 
+  } catch (err) { 
+    res.status(500).json({ error: err.message }); 
+  } 
+}); 
+
+app.post('/api/onboarding/complete', auth, async (req, res) => { 
+  try { 
+    const { role, interests } = req.body; 
+    const user = await User.findById(req.user.id); 
+    if (!user) return res.status(404).json({ error: 'User not found.' }); 
+    if (typeof role === 'string') user.profileRole = role; 
+    if (Array.isArray(interests)) user.interests = interests; 
+    await user.save(); 
+    res.json({ success: true }); 
+  } catch (err) { 
+    res.status(500).json({ error: err.message }); 
+  } 
+}); 
+
+app.get('/api/proposals/categories', async (req, res) => { 
+  try { 
+    res.json([ 
+      'General', 
+      'Infrastructure', 
+      'Education', 
+      'Health', 
+      'Environment', 
+      'Finance', 
+      'Social', 
+      'Technology', 
+    ]); 
   } catch (err) { 
     res.status(500).json({ error: err.message }); 
   } 

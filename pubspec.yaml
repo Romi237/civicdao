@@ -1,6 +1,7 @@
 name: civicdao_new
-description: CivicDAO Community Governance Platform
+description: CivicDAO — Community Governance Platform
 version: 1.0.0+1
+publish_to: 'none'
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -8,11 +9,22 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+
+  # State management
   provider: ^6.1.1
+
+  # HTTP client
   http: ^1.1.0
+
+  # Environment variables (.env file)
   flutter_dotenv: ^5.1.0
+
+  # Persist JWT token across app restarts
   shared_preferences: ^2.2.2
+
+  # Date and number formatting
   intl: ^0.18.1
+
   cupertino_icons: ^1.0.6
 
 dev_dependencies:
@@ -22,5 +34,7 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  # The .env file must be listed as an asset so flutter_dotenv can load it
   assets:
     - .env

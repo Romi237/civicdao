@@ -1,132 +1,405 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../services/api_service.dart';
+import '../services/auth_service.dart';
 import 'app_theme.dart';
 import 'shared_widgets.dart';
 
-class TreasuryScreen extends StatelessWidget {
+class TreasuryScreen extends StatefulWidget {
   const TreasuryScreen({super.key});
+  @override
+  State<TreasuryScreen> createState() => _TreasuryScreenState();
+}
 
-  static const _txns = [
-    {'type': 'in', 'label': 'Received', 'from': 'From 0x8a...3f2b', 'amount': '+2,000', 'date': 'May 14, 2024'},
-    {'type': 'out', 'label': 'Sent', 'from': 'To 0x7d...9c21', 'amount': '-1,500', 'date': 'May 13, 2024'},
-    {'type': 'in', 'label': 'Received', 'from': 'From 0x22...6a7e', 'amount': '+5,000', 'date': 'May 12, 2024'},
-    {'type': 'out', 'label': 'Sent', 'from': 'To 0x9b...4d11', 'amount': '-750', 'date': 'May 11, 2024'},
-  ];
+class _TreasuryScreenState extends State<TreasuryScreen> {
+  final _api = ApiService();
 
-  static const _allocations = [
-    {'label': 'Operations', 'pct': 34, 'amount': '19,305', 'color': AppColors.purple},
-    {'label': 'Community Grants', 'pct': 28, 'amount': '15,898', 'color': AppColors.green},
-    {'label': 'Infrastructure', 'pct': 22, 'amount': '12,492', 'color': AppColors.amber},
-    {'label': 'Reserve', 'pct': 16, 'amount': '9,085', 'color': AppColors.red},
-  ];
+  double _balance = 0;
+  List _transactions = [];
+  int _totalProposals = 0;
+  int _activeProposals = 0;
+  int _totalMembers = 0;
+  bool _loading = true;
+  String _error = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = '';
+    });
+    final result = await _api.getTreasury();
+    if (!mounted) return;
+    if (result['success'] == true) {
+      setState(() {
+        _balance = result['balance'] as double;
+        _transactions = result['transactions'] as List;
+        _totalProposals = result['totalProposals'] as int;
+        _activeProposals = result['activeProposals'] as int;
+        _totalMembers = result['totalMembers'] as int;
+        _loading = false;
+      });
+    } else {
+      setState(() {
+        _error = result['error'] ?? 'Failed.';
+        _loading = false;
+      });
+    }
+  }
+
+  String _formatAmount(num amount) {
+    if (amount >= 1000000) return 'FCFA ${(amount / 1000000).toStringAsFixed(1)}M';
+    if (amount >= 1000) return 'FCFA ${(amount / 1000).toStringAsFixed(1)}K';
+    return 'FCFA ${amount.toStringAsFixed(2)}';
+  }
 
   @override
   Widget build(BuildContext context) {
+    final isAdmin = Provider.of<AuthService>(context).isAdmin;
+
     return Scaffold(
       backgroundColor: AppColors.bg,
       appBar: AppBar(
         title: const Text('Treasury'),
-        leading: const Padding(padding: EdgeInsets.only(left: 16), child: Icon(Icons.menu_rounded, color: Colors.white70)),
-        actions: const [Padding(padding: EdgeInsets.only(right: 16), child: Icon(Icons.visibility_outlined, color: Colors.white70))],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          // Balance card
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(22),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [Color(0xFF1A1560), AppColors.purple], begin: Alignment.topLeft, end: Alignment.bottomRight),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('Treasury Balance', style: TextStyle(color: Colors.white70, fontSize: 13)),
-              const SizedBox(height: 10),
-              const Text('56,780 CIVIC', style: TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 4),
-              const Text('≈ \$25,551.00', style: TextStyle(color: Colors.white60, fontSize: 14)),
-              const SizedBox(height: 16),
-              SizedBox(height: 50, child: CustomPaint(painter: _MiniChart(), child: const SizedBox.expand())),
-            ]),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded, color: Colors.white70),
+            onPressed: _load,
           ),
-          const SizedBox(height: 26),
-          const Text('Allocation Breakdown', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 14),
-          ..._allocations.map((a) => Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Column(children: [
-              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                Text(a['label'] as String, style: const TextStyle(color: Colors.white70, fontSize: 13)),
-                Text('${a['amount']} CIVIC (${a['pct']}%)', style: const TextStyle(color: AppColors.textMuted, fontSize: 12)),
-              ]),
-              const SizedBox(height: 6),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: LinearProgressIndicator(
-                  value: (a['pct'] as int) / 100,
-                  backgroundColor: Colors.white.withValues(alpha: 0.07),
-                  valueColor: AlwaysStoppedAnimation<Color>(a['color'] as Color),
-                  minHeight: 7,
+        ],
+      ),
+      floatingActionButton: isAdmin
+          ? FloatingActionButton.extended(
+              backgroundColor: AppColors.purple,
+              icon: const Icon(Icons.add),
+              label: const Text('Add Transaction'),
+              onPressed: () => _showAddTransaction(context),
+            )
+          : null,
+      body: _loading
+          ? const Center(
+              child: CircularProgressIndicator(color: AppColors.purple),
+            )
+          : _error.isNotEmpty
+              ? Center(
+                  child: Text(
+                    _error,
+                    style: const TextStyle(color: AppColors.textSecondary),
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: _load,
+                  color: AppColors.purple,
+                  child: _buildContent(),
+                ),
+    );
+  }
+
+  Widget _buildContent() => SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Balance card ─────────────────────────────────────────────────
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF3730A3), AppColors.purple],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Community Balance',
+                    style: TextStyle(color: Colors.white60, fontSize: 13),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _formatAmount(_balance),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 34,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Total treasury funds',
+                    style: TextStyle(color: Colors.white54, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // ── Stats row ────────────────────────────────────────────────────
+            Row(
+              children: [
+                Expanded(
+                  child: _StatCard(
+                    label: 'Proposals',
+                    value: '$_totalProposals',
+                    icon: Icons.description_outlined,
+                    color: AppColors.purple,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _StatCard(
+                    label: 'Active Votes',
+                    value: '$_activeProposals',
+                    icon: Icons.how_to_vote_outlined,
+                    color: AppColors.green,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _StatCard(
+                    label: 'Members',
+                    value: '$_totalMembers',
+                    icon: Icons.people_outline,
+                    color: AppColors.amber,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+
+            // ── Recent transactions ─────────────────────────────────────────
+            const SectionHeader(
+              title: 'Recent Transactions',
+              actionLabel: '',
+              onAction: null,
+            ),
+            const SizedBox(height: 14),
+
+            if (_transactions.isEmpty)
+              const AppCard(
+                child: Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Text(
+                      'No transactions yet.',
+                      style: TextStyle(color: AppColors.textSecondary),
+                    ),
+                  ),
+                ),
+              )
+            else
+              ..._transactions.map(
+                (tx) => _TxTile(tx: tx, formatAmount: _formatAmount),
+              ),
+          ],
+        ),
+      );
+
+  void _showAddTransaction(BuildContext ctx) {
+    final amountCtrl = TextEditingController();
+    final descCtrl = TextEditingController();
+    String type = 'deposit';
+
+    showModalBottomSheet(
+      context: ctx,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetCtx) => Padding(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 20,
+          bottom: MediaQuery.of(sheetCtx).viewInsets.bottom + 20,
+        ),
+        child: StatefulBuilder(
+          builder: (_, setModal) => Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Add Transaction',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-            ]),
-          )),
-          const SizedBox(height: 26),
-          SectionHeader(title: 'Recent Transactions', actionLabel: 'See all', onAction: () {}),
-          const SizedBox(height: 14),
-          AppCard(
-            padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
-            child: Column(
-              children: _txns.asMap().entries.map((e) {
-                final t = e.value;
-                final isIn = t['type'] == 'in';
-                final isLast = e.key == _txns.length - 1;
-                return Column(children: [
-                  Padding(padding: const EdgeInsets.symmetric(vertical: 13), child: Row(children: [
-                    Container(
-                      width: 38, height: 38,
-                      decoration: BoxDecoration(color: (isIn ? AppColors.green : AppColors.red).withValues(alpha: 0.15), shape: BoxShape.circle),
-                      child: Icon(isIn ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded, color: isIn ? AppColors.green : AppColors.red, size: 18),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(t['label'] as String, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
-                      Text(t['from'] as String, style: const TextStyle(color: AppColors.textMuted, fontSize: 11)),
-                    ])),
-                    Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                      Text('${t['amount']} CIVIC', style: TextStyle(color: isIn ? AppColors.green : AppColors.red, fontSize: 13, fontWeight: FontWeight.w600)),
-                      Text(t['date'] as String, style: const TextStyle(color: AppColors.textMuted, fontSize: 11)),
-                    ]),
-                  ])),
-                  if (!isLast) const Divider(color: AppColors.border, height: 1),
-                ]);
-              }).toList(),
-            ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                initialValue: type,
+                dropdownColor: AppColors.surface,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(labelText: 'Type'),
+                items: const [
+                  DropdownMenuItem(value: 'deposit', child: Text('Deposit')),
+                  DropdownMenuItem(
+                    value: 'withdrawal',
+                    child: Text('Withdrawal'),
+                  ),
+                ],
+                onChanged: (v) => setModal(() => type = v ?? 'deposit'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: amountCtrl,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  labelText: 'Amount (FCFA)',
+                  prefixIcon: Icon(
+                    Icons.currency_exchange,
+                    color: AppColors.textMuted,
+                    size: 20,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: descCtrl,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(labelText: 'Description'),
+              ),
+              const SizedBox(height: 20),
+              PrimaryButton(
+                label: 'Add',
+                onTap: () async {
+                  final amount = double.tryParse(amountCtrl.text.trim()) ?? 0;
+                  if (amount <= 0 || descCtrl.text.trim().isEmpty) return;
+                  Navigator.pop(sheetCtx);
+                  await _api.addTransaction(
+                    type: type,
+                    amount: amount,
+                    description: descCtrl.text.trim(),
+                  );
+                  _load();
+                },
+              ),
+            ],
           ),
-          const SizedBox(height: 20),
-        ]),
+        ),
       ),
     );
   }
 }
 
-class _MiniChart extends CustomPainter {
+class _StatCard extends StatelessWidget {
+  final String label, value;
+  final IconData icon;
+  final Color color;
+  const _StatCard({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
   @override
-  void paint(Canvas canvas, Size size) {
-    final pts = [0.8, 0.6, 0.7, 0.4, 0.5, 0.3, 0.45, 0.2, 0.35, 0.1];
-    final paint = Paint()..color = Colors.white.withValues(alpha: 0.65)..strokeWidth = 2..style = PaintingStyle.stroke..strokeCap = StrokeCap.round..strokeJoin = StrokeJoin.round;
-    final fill = Paint()..shader = LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.white.withValues(alpha: 0.12), Colors.transparent]).createShader(Rect.fromLTWH(0, 0, size.width, size.height))..style = PaintingStyle.fill;
-    final path = Path(), fillPath = Path();
-    for (int i = 0; i < pts.length; i++) {
-      final x = (i / (pts.length - 1)) * size.width;
-      final y = pts[i] * size.height;
-      if (i == 0) { path.moveTo(x, y); fillPath.moveTo(x, y); } else { path.lineTo(x, y); fillPath.lineTo(x, y); }
-    }
-    fillPath..lineTo(size.width, size.height)..lineTo(0, size.height)..close();
-    canvas.drawPath(fillPath, fill);
-    canvas.drawPath(path, paint);
-  }
-  @override bool shouldRepaint(_) => false;
+  Widget build(BuildContext context) => AppCard(
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 22),
+            const SizedBox(height: 6),
+            Text(
+              value,
+              style: TextStyle(
+                color: color,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
 }
 
+class _TxTile extends StatelessWidget {
+  final Map<String, dynamic> tx;
+  final String Function(num) formatAmount;
+  const _TxTile({required this.tx, required this.formatAmount});
 
+  @override
+  Widget build(BuildContext context) {
+    final type = (tx['type'] as String? ?? '').toLowerCase();
+    final isCredit = type == 'deposit';
+    final color = isCredit ? AppColors.green : AppColors.red;
+    final amount = (tx['amount'] as num? ?? 0);
+    final desc = tx['description'] as String? ?? '';
+    final date =
+        tx['date'] != null ? DateTime.tryParse(tx['date'].toString()) : null;
+    final dateStr =
+        date != null ? '${date.day}/${date.month}/${date.year}' : '';
+
+    return AppCard(
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              isCredit ? Icons.arrow_downward : Icons.arrow_upward,
+              color: color,
+              size: 18,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  desc,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  '$type • $dateStr',
+                  style: const TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            '${isCredit ? '+' : '-'}${formatAmount(amount)}',
+            style: TextStyle(
+              color: color,
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

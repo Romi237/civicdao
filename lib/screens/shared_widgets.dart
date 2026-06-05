@@ -30,9 +30,9 @@ class StatusBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: _color.withValues(alpha: 0.15),
+        color: _color.withValues(alpha: 38),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _color.withValues(alpha: 0.3)),
+        border: Border.all(color: _color.withValues(alpha: 76)),
       ),
       child: Text(
         label,
@@ -138,7 +138,7 @@ class AppCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.card,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
+          border: Border.all(color: AppColors.border.withValues(alpha: 128)),
         ),
         child: child,
       ),
@@ -238,7 +238,7 @@ class UserAvatar extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.2),
+        color: color.withValues(alpha: 51),
         shape: BoxShape.circle,
       ),
       child: Center(

@@ -7,7 +7,7 @@
 
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:civicdao_new/screens/main.dart' as app;
+import 'package:civicdao_new/main.dart' as app;
 
 void main() {
   testWidgets('App starts and shows login', (WidgetTester tester) async {

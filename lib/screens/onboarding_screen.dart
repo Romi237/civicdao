@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../navigation/app_routes.dart';
+import '../services/api_service.dart';
 import 'app_theme.dart';
 import 'shared_widgets.dart';
 
@@ -10,13 +11,17 @@ class OnboardingScreen extends StatefulWidget {
 }
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
+  final _api = ApiService();
   int _step = 0;
   String? _selectedRole;
   final List<String> _interests = [];
+  List<Map<String, dynamic>> _roles = [];
+  List<String> _interestOptions = [];
+  bool _loadingOptions = true;
+  String _loadError = '';
 
-  final _steps = ['Welcome', 'Your role', 'Interests', 'Ready!'];
-
-  final _roles = [
+  static const _steps = ['Welcome', 'Your role', 'Interests', 'Ready!'];
+  static const _defaultRoles = [
     {
       'icon': Icons.person_outline_rounded,
       'title': 'Regular member',
@@ -37,7 +42,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     },
   ];
 
-  final _interestOptions = [
+  static const _defaultInterestOptions = [
     'Treasury',
     'Governance',
     'Events',
@@ -45,6 +50,89 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     'Technical',
     'Community',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOnboardingOptions();
+  }
+
+  Future<void> _loadOnboardingOptions() async {
+    setState(() {
+      _loadingOptions = true;
+      _loadError = '';
+    });
+
+    final result = await _api.getOnboardingOptions();
+    if (!mounted) return;
+
+    if (result['success'] == true) {
+      setState(() {
+        _roles = (result['roles'] as List).map((e) {
+          final raw = Map<String, dynamic>.from(e as Map);
+          return {
+            'icon': _iconFromName(raw['icon'] as String),
+            'title': raw['title'] as String,
+            'desc': raw['desc'] as String,
+            'color': raw['color'] is int
+                ? Color(raw['color'] as int)
+                : AppColors.purple,
+          };
+        }).toList();
+        _interestOptions = (result['interests'] as List).cast<String>();
+        _loadingOptions = false;
+      });
+    } else {
+      setState(() {
+        _loadError = result['error'] ?? 'Failed to load onboarding options.';
+        _roles = _defaultRoles;
+        _interestOptions = _defaultInterestOptions;
+        _loadingOptions = false;
+      });
+    }
+  }
+
+  Future<void> _completeOnboarding() async {
+    if (_selectedRole == null) {
+      setState(() {
+        _loadError = 'Please choose a role before continuing.';
+      });
+      return;
+    }
+
+    setState(() {
+      _loadingOptions = true;
+      _loadError = '';
+    });
+
+    final result = await _api.completeOnboarding(
+      role: _selectedRole!,
+      interests: _interests,
+    );
+    if (!mounted) return;
+
+    if (result['success'] == true) {
+      Navigator.pushReplacementNamed(context, AppRoutes.mainShell);
+    } else {
+      setState(() {
+        _loadingOptions = false;
+        _loadError = result['error'] ?? 'Failed to complete onboarding.';
+      });
+    }
+  }
+
+  IconData _iconFromName(String name) {
+    switch (name) {
+      case 'person_outline_rounded':
+        return Icons.person_outline_rounded;
+      case 'star_outline_rounded':
+        return Icons.star_outline_rounded;
+      case 'visibility_outlined':
+        return Icons.visibility_outlined;
+      default:
+        return Icons.help_outline;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -86,16 +174,34 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               const SizedBox(height: 20),
               Expanded(child: _buildStep()),
               const SizedBox(height: 20),
+              if (_loadError.isNotEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: AppColors.red.withValues(alpha: 26),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.red.withValues(alpha: 76)),
+                  ),
+                  child: Text(
+                    _loadError,
+                    style: const TextStyle(color: AppColors.red, fontSize: 13),
+                  ),
+                ),
               PrimaryButton(
                 label: _step < _steps.length - 1 ? 'Continue' : 'Get started',
                 onTap: () {
                   if (_step < _steps.length - 1) {
+                    if (_step == 1 && _selectedRole == null) {
+                      setState(() {
+                        _loadError = 'Please select a role to continue.';
+                      });
+                      return;
+                    }
                     setState(() => _step++);
                   } else {
-                    Navigator.pushReplacementNamed(
-                      context,
-                      AppRoutes.mainShell,
-                    );
+                    _completeOnboarding();
                   }
                 },
               ),
@@ -122,6 +228,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Widget _buildStep() {
+    if ((_step == 1 || _step == 2) && _loadingOptions) {
+      return const Center(
+        child: CircularProgressIndicator(color: AppColors.purple),
+      );
+    }
+
     switch (_step) {
       case 0:
         return _welcomeStep();
@@ -230,7 +342,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 border: Border.all(
                   color: selected
                       ? AppColors.purple
-                      : AppColors.border.withValues(alpha: 0.5),
+                      : AppColors.border.withValues(alpha: 128),
                 ),
               ),
               child: Row(
@@ -239,7 +351,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: (r['color'] as Color).withValues(alpha: 0.15),
+                      color: (r['color'] as Color).withValues(alpha: 38),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Icon(
@@ -328,12 +440,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ),
                 decoration: BoxDecoration(
                   color: sel
-                      ? AppColors.purple.withValues(alpha: 0.2)
+                      ? AppColors.purple.withValues(alpha: 51)
                       : AppColors.card,
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
                     color: sel
-                        ? AppColors.purple.withValues(alpha: 0.5)
+                        ? AppColors.purple.withValues(alpha: 128)
                         : AppColors.border,
                   ),
                 ),
@@ -361,7 +473,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           width: 90,
           height: 90,
           decoration: BoxDecoration(
-            color: AppColors.green.withValues(alpha: 0.15),
+            color: AppColors.green.withValues(alpha: 38),
             shape: BoxShape.circle,
           ),
           child: const Icon(
@@ -400,7 +512,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           width: 44,
           height: 44,
           decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.15),
+            color: color.withValues(alpha: 38),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(icon, color: color, size: 22),

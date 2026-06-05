@@ -1,4 +1,8 @@
-import 'package:flutter/material.dart';
+﻿from pathlib import Path
+
+root = Path('lib')
+settings_path = root / 'screens' / 'settings_screen.dart'
+content = '''import 'package:flutter/material.dart';
 import '../navigation/app_routes.dart';
 import '../services/auth_service.dart';
 import 'app_theme.dart';
@@ -28,7 +32,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final user = AuthService().currentUser;
-
     return Scaffold(
       backgroundColor: AppColors.bg,
       appBar: AppBar(
@@ -133,9 +136,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                   onTap: () => setState(
-                    () => _visibility = _visibility == 'Public'
-                        ? 'Private'
-                        : 'Public',
+                    () => _visibility = _visibility == 'Public' ? 'Private' : 'Public',
                   ),
                 ),
                 const Divider(color: AppColors.border, height: 1),
@@ -276,7 +277,7 @@ class _SettingsRow extends StatelessWidget {
             child: Text(
               label,
               style: TextStyle(
-                color: labelColor ?? Colors.white.withAlpha(217),
+                color: labelColor ?? Colors.white.withOpacity(0.85),
                 fontSize: 14,
               ),
             ),
@@ -313,10 +314,17 @@ class _ToggleRow extends StatelessWidget {
         ),
         Switch(
           value: value,
-          activeThumbColor: AppColors.purple,
+          activeColor: AppColors.purple,
           onChanged: onChanged,
         ),
       ],
     ),
   );
 }
+'''
+settings_path.write_text(content, encoding='utf-8')
+for path in root.rglob('*.dart'):
+    text = path.read_text(encoding='utf-8')
+    if '.withValues(alpha:' in text:
+        path.write_text(text.replace('.withValues(alpha:', '.withOpacity('), encoding='utf-8')
+print('updated settings screen and replaced withValues usages')
