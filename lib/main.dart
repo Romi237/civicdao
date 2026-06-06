@@ -8,7 +8,7 @@ import 'services/auth_service.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
-    await dotenv.load(fileName: '.env');
+    await dotenv.load(fileName: 'assets/env/.env');
   } catch (_) {
     dotenv.testLoad(fileInput: 'API_BASE_URL=http://10.0.2.2:3000/api\n');
   }

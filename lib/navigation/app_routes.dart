@@ -13,6 +13,7 @@ import '../screens/onboarding_screen.dart';
 import '../screens/notifications_screen.dart';
 import '../screens/profile_screen.dart';
 import '../screens/settings_screen.dart';
+import '../screens/admin_screen.dart';
 import '../services/auth_service.dart';
 
 /// All named routes in one place — easy to find and modify.
@@ -32,6 +33,7 @@ class AppRoutes {
   static const String notifications = '/notifications';
   static const String profile = '/profile';
   static const String settings = '/settings';
+  static const String admin = '/admin';
 }
 
 class AppRouteGenerator {
@@ -86,6 +88,9 @@ class AppRouteGenerator {
       case AppRoutes.settings:
         return _authRoute(const SettingsScreen());
 
+      case AppRoutes.admin:
+        return _authRoute(const AdminScreen());
+
       case AppRoutes.forgotPassword:
         return _slide(const _Placeholder('Forgot Password'));
 
@@ -139,6 +144,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
     ProposalsScreen(),
     TreasuryScreen(),
     MembersScreen(),
+    ProfileScreen(),
   ];
 
   @override
@@ -167,6 +173,11 @@ class _MainShellScreenState extends State<MainShellScreen> {
               icon: Icon(Icons.people_outline),
               selectedIcon: Icon(Icons.people),
               label: 'Members',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.person_outline),
+              selectedIcon: Icon(Icons.person),
+              label: 'Profile',
             ),
           ],
         ),

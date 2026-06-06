@@ -22,12 +22,12 @@
         name:
           - curl
           - wget
+          - openssl
           - git
           - unzip
           - htop
           - ufw
           - fail2ban
-          - nginx
         state: present
 
     - name: Create civicdao user
@@ -96,6 +96,13 @@
         name: fail2ban
         enabled: yes
         state: started
+
+    - name: Stop and disable host nginx
+      systemd:
+        name: nginx
+        enabled: no
+        state: stopped
+      failed_when: false
 
     - name: Create app directory
       file:
