@@ -72,9 +72,49 @@ You should see version numbers for both—no errors!
 
 ---
 
+## Step 2: Prepare Your Ubuntu VPS (CRITICAL!)
+
+First, let's make sure your VPS is ready for deployment! You need to do this **before** running the Ansible playbooks!
+
+### 2.1 Log In to Your VPS
+First, log in to your VPS as root using SSH:
+```bash
+ssh root@YOUR_VPS_IP
+```
+(Replace `YOUR_VPS_IP` with your actual VPS IP address)
+
+### 2.2 Update Your VPS
+Let's make sure your VPS has the latest security updates and packages:
+```bash
+apt update && apt upgrade -y
+```
+This may take a few minutes—wait for it to finish!
+
+### 2.3 Verify Your VPS is Ubuntu
+Let's make sure you're running Ubuntu (22.04 or later):
+```bash
+lsb_release -a
+```
+You should see "Ubuntu" in the output!
+
+### 2.4 Configure Your VPS Provider's Firewall
+Most VPS providers (Contabo, DigitalOcean, AWS, etc.) have a **cloud firewall** in their control panel! You **must** add these inbound rules:
+- Allow **Port 22 (SSH)**: For you to connect
+- Allow **Port 80 (HTTP)**: For web traffic
+- Allow **Port 443 (HTTPS)**: For secure web traffic
+- **Source**: 0.0.0.0/0 (allow from anywhere, or just your IP for better security)
+
+Save the firewall settings!
+
+### 2.5 Log Out of Your VPS
+For now, you can log out:
+```bash
+exit
+```
+
 ---
 
-## Step 2: Clone the Repository
+## Step 3: Clone the Repository
 On your local machine:
 ```bash
 git clone https://github.com/Romi237/civicdao.git
@@ -83,7 +123,7 @@ cd civicdao/civicdao_new/ansible
 
 ---
 
-## Step 3: Configure Your Inventory
+## Step 4: Configure Your Inventory
 Copy the example inventory file and edit it:
 ```bash
 cp inventory.example.yml inventory.yml
@@ -95,7 +135,7 @@ Open `inventory.yml` in your editor and replace:
 
 ---
 
-## Step 4: Set Up SSH Access to Your VPS
+## Step 5: Set Up SSH Access to Your VPS
 Make sure you can SSH into your VPS without a password (recommended):
 1. Generate an SSH key pair if you don't have one:
    ```bash
@@ -108,7 +148,7 @@ Make sure you can SSH into your VPS without a password (recommended):
 
 ---
 
-## Step 5: Run the Ansible Playbooks!
+## Step 6: Run the Ansible Playbooks!
 ### Provision Your VPS (Installs Docker, Security Tools, etc.)
 ```bash
 ansible-playbook -i inventory.yml setup_server.yml
@@ -121,7 +161,7 @@ ansible-playbook -i inventory.yml deploy_app.yml
 
 ---
 
-## Step 6: Access Your Deployed App
+## Step 7: Access Your Deployed App
 - **Backend Health Check**: `http://YOUR_VPS_IP/health`
 - **Backend API Base URL**: `http://YOUR_VPS_IP/api`
 - **Grafana Dashboard**: Access via SSH tunnel:
