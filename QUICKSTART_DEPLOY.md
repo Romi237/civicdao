@@ -9,25 +9,68 @@ Follow these steps to deploy CivicDAO to your Ubuntu VPS in minutes!
 
 ---
 
-## Step 1: Prepare Your Local Machine
-### Install Git
-- Windows: Download from https://git-scm.com/download/win
-- macOS: `brew install git`
-- Linux: `apt install git`
+## Step 1: Set Up Your Local Machine (CRITICAL!)
 
-### Install Ansible
-- **Windows**: Use Git Bash, then run:
-  ```bash
-  pip install ansible
-  ```
+This will prepare your computer to deploy the app!
+
+### 1.1 Install Git
+Git lets you download the app code from GitHub.
+
+- **Windows**:
+  1. Go to https://git-scm.com/download/win
+  2. Download and run the installer
+  3. Use the default settings (just click "Next" until it's done)
+  4. Open "Git Bash" from your Start menu—this is what we'll use for all commands!
+
 - **macOS**:
+  Open Terminal and run:
+  ```bash
+  brew install git
+  ```
+
+- **Linux**:
+  Open Terminal and run:
+  ```bash
+  sudo apt update && sudo apt install git -y
+  ```
+
+### 1.2 Install Ansible
+Ansible automates the deployment process for you!
+
+- **Windows (using Git Bash)**:
+  1. Open Git Bash
+  2. First, make sure Python and pip are installed:
+     ```bash
+     python --version
+     pip --version
+     ```
+  3. If you don't have pip, install Python from https://www.python.org/ (make sure to check "Add Python to PATH" during installation)
+  4. Then install Ansible:
+     ```bash
+     pip install ansible
+     ```
+
+- **macOS**:
+  Open Terminal and run:
   ```bash
   brew install ansible
   ```
+
 - **Linux**:
+  Open Terminal and run:
   ```bash
-  apt install ansible
+  sudo apt update && sudo apt install ansible -y
   ```
+
+### 1.3 Verify Your Installations
+Let's make sure everything is installed correctly! Open Git Bash (Windows) or Terminal (macOS/Linux) and run:
+```bash
+git --version
+ansible --version
+```
+You should see version numbers for both—no errors!
+
+---
 
 ---
 
