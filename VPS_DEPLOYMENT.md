@@ -16,15 +16,18 @@ apt install -y docker-compose-plugin git
 ### Step 3 — Clone your repo
 ```bash
 git clone https://github.com/Romi237/civicdao.git
-cd civicdao
+cd civicdao/civicdao_new
 ```
 
-### Step 4 — Generate backend secrets
+### Step 4 — Create required env files
 ```bash
 cd backend
-node dds.js
+printf "JWT_SECRET=%s\nJWT_REFRESH_SECRET=%s\n" "$(openssl rand -hex 48)" "$(openssl rand -hex 48)" > .env
 cd ..
+
+cp .env.example .env
 ```
+Edit `.env` and set strong values for `MONGO_PASS` and `GRAFANA_PASS`.
 
 ### Step 5 — Start everything
 ```bash
@@ -33,27 +36,30 @@ docker compose up -d
 
 ### Step 6 — Verify it is running
 ```bash
-curl http://localhost:3000/health
+curl http://localhost/health
 # Expected: {"status":"ok","db":"connected"}
 ```
 
 ### Step 7 — Check Prometheus metrics
 ```bash
 curl http://localhost:9090
-# Open in browser: http://YOUR_VPS_IP:9090
 ```
 
 ### Step 8 — Open Grafana
-Open in browser: `http://YOUR_VPS_IP:3001`
-Login: admin / admin
+Grafana is bound to localhost. Use an SSH tunnel:
+```bash
+ssh -L 3001:localhost:3001 -L 9090:localhost:9090 root@YOUR_VPS_IP
+```
+Then open:
+`http://localhost:3001`
 
 ---
 
 ## Update the Flutter app to point at your VPS
 
-Once deployed, open `.env` and change:
+Once deployed, open `assets/env/.env` and change:
 ```
-API_BASE_URL=http://YOUR_VPS_IP:3000/api
+API_BASE_URL=http://YOUR_VPS_IP/api
 ```
 
 Then rebuild:
@@ -82,16 +88,11 @@ This is enough to run MongoDB + Backend + Nginx + Prometheus + Grafana.
 | Port | Service              |
 |------|----------------------|
 | 80   | Nginx (HTTP)         |
-| 3000 | Backend API          |
-| 9090 | Prometheus           |
-| 3001 | Grafana              |
-| 27017| MongoDB (keep closed)|
+| 443  | HTTPS (optional)     |
 
 Open ports with:
 ```bash
 ufw allow 80
-ufw allow 3000
-ufw allow 9090
-ufw allow 3001
+ufw allow 443
 ufw enable
 ```

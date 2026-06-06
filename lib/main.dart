@@ -5,14 +5,17 @@ import 'screens/app_theme.dart';
 import 'navigation/app_routes.dart';
 import 'services/auth_service.dart';
 
-Future<void> main() async {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
-    await dotenv.load(fileName: '.env');
-  } catch (_) {
+    await dotenv.load(fileName: 'assets/env/.env');
+    print('Loaded .env file successfully');
+  } catch (e) {
+    print('Failed to load .env file: $e');
     dotenv.testLoad(fileInput: 'API_BASE_URL=http://10.0.2.2:3000/api\n');
   }
   await AuthService().init();
+  print('AuthService initialized, isLoggedIn: ${AuthService().isLoggedIn}');
   runApp(
     ChangeNotifierProvider<AuthService>(
       create: (_) => AuthService(),
@@ -30,8 +33,7 @@ class CivicDaoApp extends StatelessWidget {
       title: 'CivicDAO',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.dark,
-      initialRoute:
-          AuthService().isLoggedIn ? AppRoutes.mainShell : AppRoutes.login,
+      initialRoute: AppRoutes.login,
       onGenerateRoute: AppRouteGenerator.generateRoute,
     );
   }

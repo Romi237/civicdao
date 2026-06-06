@@ -7,7 +7,8 @@ import 'app_theme.dart';
 import 'shared_widgets.dart';
 
 class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({super.key});
+  final bool showBackButton;
+  const ProfileScreen({super.key, this.showBackButton = false});
 
   String _shortId(String id) {
     if (id.length <= 10) return id;
@@ -59,18 +60,46 @@ class ProfileScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: AppColors.bg,
-      appBar: AppBar(
-        leading: const Padding(
-          padding: EdgeInsets.only(left: 16),
-          child: Icon(Icons.menu_rounded, color: Colors.white70),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings_outlined, color: Colors.white70),
-            onPressed: () => Navigator.pushNamed(context, AppRoutes.settings),
-          ),
-        ],
-      ),
+      appBar: showBackButton
+          ? AppBar(
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => Navigator.pop(context),
+              ),
+              actions: [
+                if (user.role == 'admin')
+                  IconButton(
+                    icon: const Icon(Icons.admin_panel_settings_outlined,
+                        color: Colors.white70),
+                    onPressed: () =>
+                        Navigator.pushNamed(context, AppRoutes.admin),
+                  ),
+                IconButton(
+                  icon: const Icon(Icons.settings_outlined,
+                      color: Colors.white70),
+                  onPressed: () =>
+                      Navigator.pushNamed(context, AppRoutes.settings),
+                ),
+              ],
+            )
+          : AppBar(
+              title: const Text('Profile'),
+              actions: [
+                if (user.role == 'admin')
+                  IconButton(
+                    icon: const Icon(Icons.admin_panel_settings_outlined,
+                        color: Colors.white70),
+                    onPressed: () =>
+                        Navigator.pushNamed(context, AppRoutes.admin),
+                  ),
+                IconButton(
+                  icon: const Icon(Icons.settings_outlined,
+                      color: Colors.white70),
+                  onPressed: () =>
+                      Navigator.pushNamed(context, AppRoutes.settings),
+                ),
+              ],
+            ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 20),
         child: Column(
@@ -240,12 +269,103 @@ class ProfileScreen extends StatelessWidget {
                 ],
               ),
             ),
+            const SizedBox(height: 22),
+            // Logout button
+            AppCard(
+              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
+              child: _SettingsRow(
+                icon: Icons.logout_rounded,
+                label: 'Sign out',
+                iconColor: AppColors.red,
+                labelColor: AppColors.red,
+                onTap: () => showDialog(
+                  context: context,
+                  builder: (_) => AlertDialog(
+                    backgroundColor: AppColors.card,
+                    title: const Text(
+                      'Sign out',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    content: const Text(
+                      'Are you sure you want to sign out?',
+                      style: TextStyle(color: AppColors.textSecondary),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text(
+                          'Cancel',
+                          style: TextStyle(color: AppColors.textSecondary),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () async {
+                          await AuthService().logout();
+                          if (context.mounted) {
+                            Navigator.pushNamedAndRemoveUntil(
+                              context,
+                              AppRoutes.login,
+                              (_) => false,
+                            );
+                          }
+                        },
+                        child: const Text(
+                          'Sign out',
+                          style: TextStyle(color: AppColors.red),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
             const SizedBox(height: 30),
           ],
         ),
       ),
     );
   }
+}
+
+class _SettingsRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final Color? iconColor;
+  final Color? labelColor;
+
+  const _SettingsRow({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.iconColor,
+    this.labelColor,
+  });
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          child: Row(
+            children: [
+              Icon(icon, color: iconColor ?? AppColors.textSecondary, size: 18),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: labelColor ?? Colors.white.withAlpha(217),
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+              const Icon(Icons.chevron_right,
+                  color: AppColors.textMuted, size: 16),
+            ],
+          ),
+        ),
+      );
 }
 
 class _StatCell extends StatelessWidget {

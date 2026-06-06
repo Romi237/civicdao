@@ -88,6 +88,17 @@ pipeline {
               sh 'npm test'
             }
           }
+          post {
+            always {
+              publishHTML(target: [
+                allowMissing: true,
+                reportDir: 'backend/coverage',
+                reportFiles: 'lcov-report/index.html',
+                reportName: 'Backend Coverage'
+              ])
+              junit 'backend/coverage/junit.xml'
+            }
+          }
         }
       }
     }

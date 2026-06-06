@@ -22,12 +22,12 @@
         name:
           - curl
           - wget
+          - openssl
           - git
           - unzip
           - htop
           - ufw
           - fail2ban
-          - nginx
         state: present
 
     - name: Create civicdao user
@@ -42,9 +42,14 @@
         url: https://download.docker.com/linux/ubuntu/gpg
         state: present
 
+    - name: Get Ubuntu codename
+      command: lsb_release -cs
+      register: ubuntu_codename
+      changed_when: false
+
     - name: Add Docker repository
       apt_repository:
-        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable"
+        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ubuntu_codename.stdout }} stable"
         state: present
 
     - name: Install Docker CE
@@ -96,6 +101,13 @@
         name: fail2ban
         enabled: yes
         state: started
+
+    - name: Stop and disable host nginx
+      systemd:
+        name: nginx
+        enabled: no
+        state: stopped
+      failed_when: false
 
     - name: Create app directory
       file:

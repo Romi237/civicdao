@@ -10,7 +10,7 @@
     app_user: civicdao
     app_dir: /opt/civicdao
     git_repo: https://github.com/Romi237/civicdao.git
-    git_branch: main
+    git_branch: "{{ git_branch | default('main') }}"
 
   tasks:
 
@@ -22,23 +22,65 @@
         force: yes
       become_user: "{{ app_user }}"
 
-    - name: Copy backend .env to server
-      template:
-        src: templates/backend.env.j2
-        dest: "{{ app_dir }}/app/backend/.env"
+    - name: Check compose .env exists
+      stat:
+        path: "{{ app_dir }}/app/civicdao_new/.env"
+      register: compose_env
+
+    - name: Generate MongoDB password
+      command: openssl rand -hex 24
+      register: mongo_pass
+      changed_when: false
+      when: not compose_env.stat.exists
+
+    - name: Generate Grafana password
+      command: openssl rand -hex 24
+      register: grafana_pass
+      changed_when: false
+      when: not compose_env.stat.exists
+
+    - name: Create compose .env
+      copy:
+        dest: "{{ app_dir }}/app/civicdao_new/.env"
+        content: "MONGO_USER=admin\nMONGO_PASS={{ mongo_pass.stdout }}\nGRAFANA_USER=admin\nGRAFANA_PASS={{ grafana_pass.stdout }}\nCORS_ORIGIN=*\n"
         owner: "{{ app_user }}"
         mode: '0600'
+      when: not compose_env.stat.exists
+
+    - name: Check backend .env exists
+      stat:
+        path: "{{ app_dir }}/app/civicdao_new/backend/.env"
+      register: backend_env
+
+    - name: Generate JWT secret
+      command: openssl rand -hex 48
+      register: jwt_secret
+      changed_when: false
+      when: not backend_env.stat.exists
+
+    - name: Generate JWT refresh secret
+      command: openssl rand -hex 48
+      register: jwt_refresh_secret
+      changed_when: false
+      when: not backend_env.stat.exists
+
+    - name: Create backend .env
+      copy:
+        dest: "{{ app_dir }}/app/civicdao_new/backend/.env"
+        content: "JWT_SECRET={{ jwt_secret.stdout }}\nJWT_REFRESH_SECRET={{ jwt_refresh_secret.stdout }}\n"
+        owner: "{{ app_user }}"
+        mode: '0600'
+      when: not backend_env.stat.exists
 
     - name: Deploy with Docker Compose
-      community.docker.docker_compose_v2:
-        project_src: "{{ app_dir }}/app"
-        pull: always
-        state: present
+      command: docker compose up -d --build
+      args:
+        chdir: "{{ app_dir }}/app/civicdao_new"
       become_user: "{{ app_user }}"
 
     - name: Wait for backend health check
       uri:
-        url: http://localhost:3000/health
+        url: http://localhost/health
         method: GET
         status_code: 200
       register: health
@@ -46,16 +88,9 @@
       delay: 10
       until: health.status == 200
 
-    - name: Reload Nginx
-      systemd:
-        name: nginx
-        state: reloaded
-
     - name: Remove unused Docker images
-      community.docker.docker_prune:
-        images: yes
-        images_filters:
-          dangling: true
+      command: docker image prune -f
+      changed_when: false
 
     - name: Done
       debug:

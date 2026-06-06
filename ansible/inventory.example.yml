@@ -1,0 +1,20 @@
+---
+# CivicDAO Ansible Inventory
+# Copy this file and rename to inventory.yml
+# Replace the values below with your VPS details
+
+civicdao_servers:
+  hosts:
+    your_vps_hostname_or_ip:  # e.g., 13.140.138.193 or civicdao.example.com
+      ansible_user: root
+      ansible_host: YOUR_VPS_IP_ADDRESS  # Replace with your VPS IP
+      ansible_port: 22
+      # Optional: If you use SSH keys (RECOMMENDED)
+      # ansible_ssh_private_key_file: ~/.ssh/your_private_key
+
+  vars:
+    # Optional: Override default variables here
+    # app_user: civicdao
+    # app_dir: /opt/civicdao
+    # git_repo: https://github.com/Romi237/civicdao.git
+    git_branch: feat/backend-sprint1  # Use your current branch

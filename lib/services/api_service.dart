@@ -14,7 +14,7 @@ class ApiService {
   static const _timeout = Duration(seconds: 15);
 
   String get _base =>
-      dotenv.get('API_BASE_URL', fallback: 'http://10.0.2.2:3000/api');
+      dotenv.get('API_BASE_URL', fallback: 'http://10.0.2.2/api');
 
   // ── Core request helper — retries once after silent token refresh ─────────
   Future<http.Response> _req(String method, String path,

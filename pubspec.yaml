@@ -37,4 +37,4 @@ flutter:
 
   # The .env file must be listed as an asset so flutter_dotenv can load it
   assets:
-    - .env
+    - assets/env/.env

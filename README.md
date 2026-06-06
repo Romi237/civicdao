@@ -1,20 +1,26 @@
-<<<<<<< HEAD
-# civicdao_new
+# CivicDAO
 
-A new Flutter project.
+Flutter client + Node.js/Express backend + MongoDB.
 
-## Getting Started
+## VPS deployment
 
-This project is a starting point for a Flutter application.
+See [VPS_DEPLOYMENT.md](VPS_DEPLOYMENT.md).
 
-A few resources to get you started if this is your first Flutter project:
+## Local development
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+Backend:
+```bash
+cd backend
+npm ci
+cp .env.example .env
+npm run dev
+```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
-=======
-# civicdao
->>>>>>> 2e2112114fe0a7d0cdf1eebf823a5f108b58c5aa
+Docker (full stack):
+```bash
+cp .env.example .env
+cd backend
+printf "JWT_SECRET=%s\nJWT_REFRESH_SECRET=%s\n" "$(openssl rand -hex 48)" "$(openssl rand -hex 48)" > .env
+cd ..
+docker compose up -d --build
+```
