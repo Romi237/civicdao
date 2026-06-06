@@ -9,6 +9,22 @@ Follow these steps to deploy CivicDAO to your Ubuntu VPS in minutes!
 
 ---
 
+## Step 0: Wipe/Reinstall Your VPS (Optional but Highly Recommended)
+
+If your VPS already has other things installed, it's best to start fresh! This will erase everything on your VPS and give you a clean Ubuntu installation!
+
+### How to Do This:
+1. Log in to your VPS provider's control panel (e.g., Contabo, DigitalOcean, AWS)
+2. Find your VPS in the list
+3. Look for an option like **"Reinstall"**, **"Reset"**, **"Wipe"**, or **"Rebuild"**
+4. Choose **Ubuntu 22.04 LTS** or **Ubuntu 24.04 LTS** (latest LTS version recommended)
+5. Confirm the reinstallation—this may take 5-15 minutes
+6. Once done, your VPS provider will give you a new root password (save this!)
+
+---
+
+---
+
 ## Step 1: Set Up Your Local Machine (CRITICAL!)
 
 This will prepare your computer to deploy the app!
