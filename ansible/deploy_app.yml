@@ -10,7 +10,7 @@
     app_user: civicdao
     app_dir: /opt/civicdao
     git_repo: https://github.com/Romi237/civicdao.git
-    git_branch: main
+    git_branch: "{{ git_branch | default('main') }}"
 
   tasks:
 
